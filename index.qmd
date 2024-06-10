@@ -1,0 +1,76 @@
+---
+title: "Landscape Assessment for the Hiawatha National Forest"
+author: "Randy Swaty, with substantial code from Myles Walimaa"
+---
+
+## Goals of this demonstration
+
+We will use [LANDFIRE](https://landfire.gov/){target="blank"} products to:
+
+1. Characterize and map past and present ecosystem conditions.
+2. Explore historical disturbance patterns.
+3. Summarize patterns of change and management opportunities.
+
+
+The following charts, maps, and graphs are based on current LANDFIRE products, and provide a starting point for further analysis.
+
+This demonstration will:
+
+* Provide context for the past and present ecosystem conditions of the Hiawatha National Forest.
+* Demonstrate the power of data visualization to explore ecological patterns and functions using LANDFIRE products.
+* Facilitate an understanding of historical and current conditions on a regional scale.
+
+## Location
+
+<br>
+
+```{r libraries, message=FALSE, warning=FALSE, include=FALSE}
+
+library(foreign)
+library(sf)
+library(terra)
+library(tidyverse)
+library(raster)
+
+
+```
+
+
+```{r read shapefile, message=FALSE, warning=FALSE, include=FALSE}
+#  read shape
+shp <- st_read("data/hiawathaFuels.shp") %>% 
+  st_transform(crs = 5070) %>%
+  st_union() %>%
+  st_sf()
+```
+
+```{r locator map, message=FALSE, warning=FALSE, echo=FALSE}
+library(tmap)
+
+# toggle tmap mode to interactive viewing
+tmap_mode("view")
+
+# create a quick interactive map
+quickmap <- qtm(shp, 
+                borders = "darkgreen", 
+                fill = NULL, 
+                check.and.fix = TRUE, 
+                basemaps = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+                title = 'Hiawatha National Forest (fuels assessment area)',)
+
+quickmap
+
+
+
+```
+
+## How to use this web report
+
+* All maps, input datasets and further assistance can be obtained by contacting the author, [Randy Swaty](mailto:rswaty@tnc.org){target="blank"}.
+* Review is ongoing.
+* To share this web app, simply share the hyperlink.
+* Toggle between dark and light display of this site in the upper right corner of the page.
+
+
+
+

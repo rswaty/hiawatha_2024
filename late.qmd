@@ -1,0 +1,174 @@
+---
+title: "Late Succession"
+---
+
+## Historical Late Succession Classes
+
+The LANDFIRE BpS models include descriptions of succession classes.  These descriptions often split out 'Late' from 'Early' and 'Mid' classes.  Additionally, as presented below, some classes are split into 'Open' and 'Closed' classes.  
+
+For this chart we lumped all 'Early' and 'Mid' classes together into 'Other', and did not split out 'Open' and 'Closed' classes.  
+
+**Note: 'Late' may or may not include 'old-growth;, which is a different concept.  Go to [https://landfirereview.org/search.php](https://landfirereview.org/search.php){target='blank'} to download descriptions. ** 
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, fig.width=10, fig.height=10}
+
+## stacked bar, bps x age class
+
+## stacked bar, bps x class label (early, mid, late)
+
+# Load packages
+library(tidyverse)
+library(scales)
+
+# Options
+
+options(scipen = 9999999999)
+
+words_to_remove <- c("Laurentian-Acadian ",
+                  "Boreal ",
+                  "Laurentian ",
+                  "Great Lakes ",
+                  "Central ")
+
+final_df_full <- read.csv("data/final_df_full.csv")
+
+
+for_chart <- final_df_full %>%
+  filter(!is.na(age_category)) %>%
+  filter(bps_acres > 10000) %>%
+  dplyr::select(c("age_category",
+           "ref_scls_acres", 
+           "bps_name", 
+           "bps_acres"))%>%
+  group_by(bps_name, age_category) %>%
+  summarise(sum_scls_acres = sum(ref_scls_acres)) %>%
+  mutate(bps_name = str_replace_all(bps_name, paste(words_to_remove, collapse = "|"), "")) %>%
+  mutate(age_category = fct_collapse(age_category, Other = c("Early1",
+                                                         "Early2",
+                                                         "Mid1",
+                                                         "Mid2"))) %>%
+  mutate(age_category = fct_collapse(age_category, Late = c("Late1",
+                                                             "Late2",
+                                                             "Late3"))) %>%
+  group_by(age_category, bps_name) %>%
+  summarise(sum_scls_acres = sum(sum_scls_acres))
+
+geographies <- c(
+  "Boreal ",
+  "Central Interior and Appalachian ",
+  "Great Lakes ",
+  "Laurentian ",
+  "Laurentian-Acadian ",
+  "North-Central Interior ")
+
+
+  
+plot_acres <-
+  ggplot(for_chart, aes(fill = age_category, y = sum_scls_acres, x = reorder(bps_name, -sum_scls_acres))) +
+  geom_bar(position = "stack", stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Biophysical Settings of the area, with estimated reference acres of \n'late' and 'other' succession classes",
+    subtitle = "",
+    caption = "Data from landfire.gov. BpSs with small footprint removed for clarity (> 10k acres)",
+    x = "",
+    y = "Acres",
+    fill = "Succession Class") +
+  scale_x_discrete(limits = rev) +
+  scale_y_continuous(label = comma, n.breaks = 4) + 
+  theme_bw(base_size = 16) + 
+  scale_fill_manual(values = c("#f5922f", # orange
+                               "#532a66" # purple
+ )) +
+  theme(plot.caption = element_text(hjust = 0, face = "italic"), #Default is hjust=1
+        plot.title.position = "plot", #NEW parameter. Apply for subtitle too.
+        plot.caption.position =  "plot") +
+  theme(legend.position = c(0.8, 0.3)) + 
+  theme(plot.margin = unit(c(0.2, 0.75, 0.2, 0.2),
+                           "inches"))
+
+plot_acres
+
+```
+
+
+
+## Comparing late succession past and present, split by open and closed canopy
+
+Below is a chart comparing modeled past (pre-European colonization) amounts of open and closed late-succession classes per Biophysical Setting.  
+
+* The beginning of each arrow is the past modeled amount; the end of the arrow is how much is mapped today.
+* Arrows/charts do not indicate specific transitions from one succession class to another.  For example there has been a total loss of late-succession in the Northern Hardwood BpS.  We do not indicate here which other succession classes have 'gained' over time.
+* Each BpS has specific rules for what constitutes 'Open' or 'Closed', and some BpSs may not have all classes.  For example, the Northern Pine(Oak) Forest description and model does not have a 'Late-Open' class.  This is also true for the Boreal Jack Pine-Black Spruce Forest - Pine Barrens BpS which was dominated by Early and Mid-Open classes historically.
+* Also note that some BpSs represented a relativily small portion of the landscape.  See 'Past' page.  
+
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, fig.width=12, fig.height=10}
+## read in data
+
+words_to_remove <- c("Laurentian-Acadian ",
+                  "Boreal ",
+                  "Laurentian ",
+                  "Great Lakes ",
+                  "Central ")
+
+raw_data <- read.csv("data/final_df_full.csv")
+
+
+## filter, group and add helper columns
+
+
+old_classes <- c("Late1", "Late2")
+
+#old_growth_chng_canopy$bps_name <- gsub(paste(words_to_remove, collapse = "|"), "", old_growth_chng_canopy$bps_name)
+
+old_growth_chng_canopy <- raw_data %>%
+  filter(age_category %in% old_classes) %>%
+  filter(canopy_category != 'ALL') %>%
+  slice_max(order_by = bps_acres, n = 16) %>%
+  group_by(bps_name, canopy_category) %>%
+  summarize(ref_percent = sum(ref_percent, na.rm = TRUE),
+            cur_percent = sum(cur_percent, na.rm = TRUE),
+            bps_acres = max(bps_acres)) %>%
+  mutate(change = cur_percent - ref_percent,
+         sign_change = (change > 0))  
+
+old_growth_chng_canopy <- old_growth_chng_canopy %>%
+  mutate(bps_name = str_replace_all(bps_name, paste(words_to_remove, collapse = "|"), ""))
+
+
+
+## try chart with facets
+
+facet_names <- c(
+  "CLS" = "Closed Canopy",
+  "OPN" = "Open Canopy"
+)
+
+canopy_arrow_plot <- old_growth_chng_canopy %>%
+  ggplot(aes(
+    x = ref_percent, xend = cur_percent, 
+    y = reorder(bps_name, bps_acres), yend = bps_name,
+    color = sign_change)) +
+  geom_segment(
+    arrow = arrow(angle = 30, length = unit(0.5, 'cm')),
+    size = 2) +
+  labs(
+    x = 'Percent Change', 
+    y = element_blank(),
+    title = 'Changes in Late Succession Classes Historical to ~2022',
+    subtitle = 'Arrows in descending order by total extent of ecosystem'
+  ) +
+  scale_color_manual(
+    values = c("#fcba03", "#10692c")) +
+  theme_bw(base_size = 14) + 
+  theme(legend.position = "none") +
+  facet_wrap(~ canopy_category, 
+             ncol = 2,
+             labeller = as_labeller(facet_names))
+
+canopy_arrow_plot
+```
+

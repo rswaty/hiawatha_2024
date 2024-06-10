@@ -1,0 +1,168 @@
+---
+title: "Comparisons"
+---
+
+```{r include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+library(chorddiag)
+library(htmlwidgets)
+library(igraph)
+library(readr)
+library(tidygraph)
+library(tidyverse)
+
+```
+
+## Comparing Past vs. Present Conditions
+
+Using LANDFIRE’s BpS products, we explore two different ways to visualize past vs. current vegetation patterns.
+
+-   First, we present **changes in broad ecosystem types** using an interactive comparison diagram. To present these broad ecosystem trends more effectively, we combined classifications of Existing Vegetation Types (EVT) into broader categories. The Developed EVTs of high, medium, and low intensity, and Quarries-Strip Mines-Gravel Pits EVTs were combined into one "Developed" EVT. Exotic Herbaceous and Exotic Tree-shrub EVTs were combined into one "Exotics" EVT.
+
+-   Second, we compare **amounts of succession classes** (past and present) for the most prevalent ecosystems.
+
+## Summary
+
+* Conifers, by percentage, were mapped to have experienced the most change between past and present, with over half being mapped as other types (e.g., Hardwoods or Developed) in the Existing Vegetation Type dataset.
+* There are BpSs with substantial over/under representation of succession classes.  For example the Northern Hardwoods-Hemlock currently has no succession class D, and the Jack Pine-Black Spruce Forest-Pine Barrens shows an over-representation of succession class D. 
+
+
+** Chord Diagram**
+
+*Note: number presented when hovering equals acres.*
+
+```{r chord, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# read in data
+chord_df<- read_csv("data/bps2evt_chord.csv")
+#view(histFireGVchord)
+
+#convert to matrix
+matrix_df <-as.matrix(as_adjacency_matrix(as_tbl_graph(chord_df),attr = "ACRES"))
+
+#clean up matrix (could be cleaner!)
+matrix_df = subset(matrix_df, select = -c(1:5))
+
+matrix_df <- matrix_df[-c(6:13),]
+
+#make a custom color pallet #eb4034 (redish) #b0af9e(grey)
+
+# ORIGINAL
+groupColors <-c( "#1d4220", # past conifer
+                 "#fc9d03", # past grassland
+                 "#56bf5f", # past hardwood
+                 "#397d3f", # past hdw-con
+                 "#7db7c7", # past riparian
+                 "#f5e942", # cur ag
+                 "#1d4220", # cur conifer
+                 "#397d3f", # cur hdw-con
+                 "#b0af9e", # developed
+                 "#eb4034", # exotics
+                 "#fc9d03", # past grassland
+                 "#56bf5f", # hardwood
+                 "#7db7c7" # riparian
+               
+             
+                 
+                 
+
+
+)
+
+
+
+#make chord diagram
+chord<-chorddiag(data = matrix_df,
+                 type = "bipartite",
+                 groupColors = groupColors,
+                 groupnamePadding = 10,
+                 groupPadding = 3,
+                 groupnameFontsize = 12 ,
+                 showTicks = FALSE,
+                 margin=150,
+                 tooltipGroupConnector = "    &#x25B6;    ",
+                 chordedgeColor = "#363533"
+)
+chord
+
+#save then print to have white background
+htmlwidgets::saveWidget(chord,
+                        "chord.html",
+                        background = "white",
+                        selfcontained = TRUE
+                        )
+```
+
+<iframe src="chord.html" height="720" width="720" style="border: 1px solid #464646;" allowfullscreen allow="autoplay" data-external=".5">
+
+</iframe>
+
+<br>
+
+## Succession classes for three most dominant BpSs
+
+
+```{r scls chart, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+BPS_SCLS2 <- read.csv("data/bpsScls2.csv")
+
+top_3_groups <- BPS_SCLS2 %>%
+  group_by(BpS_Name) %>%
+  summarize(total_count = sum(Freq, na.rm = TRUE)) %>%
+  top_n(6, total_count) %>%
+  pull(BpS_Name)
+
+bps_scls_3 <- BPS_SCLS2 %>%
+  group_by(Var1) %>%
+  #mutate(total.count = sum(Freq)) %>%
+  ungroup() %>%
+  filter(BpS_Name %in% top_3_groups) %>%
+  dplyr::select(c("BpS_Name", "refLabel",  "currentPercent", "refPercent")) %>%
+  pivot_longer(
+    cols = c(`refPercent`, `currentPercent`),
+    names_to = "refCur",
+    values_to = "Percent"
+    )
+
+write.csv(bps_scls_3, "final_df.csv")
+
+# order classes
+bps_scls_3$refLabel <- factor(bps_scls_3$refLabel, levels= c(
+  "Developed",
+  "Agriculture",
+  "UE",
+  "UN",
+  "E",
+  "D",
+  "C",
+  "B",
+  "A"))
+
+
+
+
+sclasplot <-
+  ggplot(bps_scls_3, aes(fill=factor(refCur), y=Percent, x=refLabel)) +
+  geom_col(width = 0.8, position = position_dodge()) +
+  coord_flip() +
+  facet_grid(. ~BpS) +
+  scale_x_discrete(limits = (levels(bps_scls_3$refLabel))) +
+  labs(
+    title = "Succession Classes past and present",
+    subtitle = "6 BpSs selected for illustration. Not all succession classes present in all BpSs.",
+    caption = "Data from landfire.gov; Chart © Randy Swaty",
+    x = "",
+    y = "Percent")+
+  theme_minimal(base_size = 14)+
+  theme(plot.title.position = "plot", #NEW parameter. Apply for subtitle too.
+        plot.caption.position =  "plot") +
+  scale_fill_manual(values = c("#3d4740", "#32a852" ), # present (grey), historical (green)
+                    name = " ",
+                    labels = c("Present",
+                               "Past")) +
+  facet_wrap(~BpS_Name, nrow(3),labeller = labeller(BpS_Name = label_wrap_gen())) +
+    theme(panel.spacing = unit(.05, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1),
+        strip.background = element_rect(color = "black", size = 1))
+
+sclasplot
+
+```
